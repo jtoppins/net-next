@@ -178,7 +178,7 @@ static s32 igb_init_phy_params_82575(struct e1000_hw *hw)
 
 	ctrl_ext = rd32(E1000_CTRL_EXT);
 
-	if (igb_sgmii_active_82575(hw)) {
+	if (igb_sgmii_active_82575(hw) && phy->type != e1000_phy_bcm5461s) {
 		phy->ops.reset = igb_phy_hw_reset_sgmii_82575;
 		ctrl_ext |= E1000_CTRL_I2C_ENA;
 	} else {
@@ -288,6 +288,11 @@ static s32 igb_init_phy_params_82575(struct e1000_hw *hw)
 		break;
 	case BCM54616_E_PHY_ID:
 		phy->type = e1000_phy_bcm54616;
+		break;
+	case BCM5461S_E_PHY_ID:
+		phy->type                   = e1000_phy_bcm5461s;
+		phy->ops.get_phy_info       = igb_get_phy_info_5461s;
+		phy->ops.force_speed_duplex = igb_phy_force_speed_duplex_82580;
 		break;
 	default:
 		ret_val = -E1000_ERR_PHY;
@@ -841,6 +846,15 @@ static s32 igb_get_phy_id_82575(struct e1000_hw *hw)
 			goto out;
 		}
 		ret_val = igb_get_phy_id(hw);
+		if (ret_val && hw->mac.type == e1000_i354) {
+			/* We do a special check for bcm5461s phy by setting
+			 * the phy->addr to 5 and doing the phy check again.
+			 * This call will succeed and retrieve a valid phy
+			 * id if we have the bcm5461s phy.
+			 */
+			phy->addr = 5;
+			ret_val = igb_get_phy_id(hw);
+		}
 		goto out;
 	}
 
@@ -1221,6 +1235,9 @@ static s32 igb_get_cfg_done_82575(struct e1000_hw *hw)
 	    (hw->phy.type == e1000_phy_igp_3))
 		igb_phy_init_script_igp3(hw);
 
+	if (hw->phy.type == e1000_phy_bcm5461s)
+		igb_phy_init_script_5461s(hw);
+
 	return 0;
 }
 
@@ -1597,6 +1614,7 @@ static s32 igb_setup_copper_link_82575(struct e1000_hw *hw)
 		ret_val = igb_copper_link_setup_82580(hw);
 		break;
 	case e1000_phy_bcm54616:
+	case e1000_phy_bcm5461s:
 		break;
 	default:
 		ret_val = -E1000_ERR_PHY;
