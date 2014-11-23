@@ -60,6 +60,10 @@ static int bond_option_pps_set(struct bonding *bond,
 			       const struct bond_opt_value *newval);
 static int bond_option_lacp_rate_set(struct bonding *bond,
 				     const struct bond_opt_value *newval);
+static int bond_option_lacp_bypass_set(struct bonding *bond,
+					 const struct bond_opt_value *newval);
+static int bond_option_lacp_bypass_timeout_set(struct bonding *bond,
+					const struct bond_opt_value *newval);
 static int bond_option_ad_select_set(struct bonding *bond,
 				     const struct bond_opt_value *newval);
 static int bond_option_queue_id_set(struct bonding *bond,
@@ -132,6 +136,12 @@ static const struct bond_opt_value bond_lacp_rate_tbl[] = {
 	{ "slow", AD_LACP_SLOW, 0},
 	{ "fast", AD_LACP_FAST, 0},
 	{ NULL,   -1,           0},
+};
+
+static const struct bond_opt_value bond_lacp_bypass_tbl[] = {
+	{ "off", 0,  BOND_VALFLAG_DEFAULT},
+	{ "on",  1,  0},
+	{ NULL,  -1, 0}
 };
 
 static const struct bond_opt_value bond_ad_select_tbl[] = {
@@ -379,6 +389,23 @@ static const struct bond_option bond_opts[BOND_OPT_LAST] = {
 		.values = bond_tlb_dynamic_lb_tbl,
 		.flags = BOND_OPTFLAG_IFDOWN,
 		.set = bond_option_tlb_dynamic_lb_set,
+	},
+	[BOND_OPT_LACP_BYPASS] = {
+		.id = BOND_OPT_LACP_BYPASS,
+		.name = "lacp_bypass",
+		.desc = "LACP bond allow switch to bring up bond before"
+		        " and LACP PDUs are received",
+		.unsuppmodes = BOND_MODE_ALL_EX(BIT(BOND_MODE_8023AD)),
+		.values = bond_lacp_bypass_tbl,
+		.set = bond_option_lacp_bypass_set
+	},
+	[BOND_OPT_LACP_BYPASS_TIMEOUT] = {
+		.id = BOND_OPT_LACP_BYPASS_TIMEOUT,
+		.name = "lacp_bypass_timeout",
+		.desc = "LACP bypass timeout period",
+		.unsuppmodes = BOND_MODE_ALL_EX(BIT(BOND_MODE_8023AD)),
+		.values = bond_intmax_tbl,
+		.set = bond_option_lacp_bypass_timeout_set
 	}
 };
 
@@ -1219,6 +1246,26 @@ static int bond_option_lacp_rate_set(struct bonding *bond,
 		    newval->string, newval->value);
 	bond->params.lacp_fast = newval->value;
 	bond_3ad_update_lacp_rate(bond);
+
+	return 0;
+}
+
+static int bond_option_lacp_bypass_set(struct bonding *bond,
+					 const struct bond_opt_value *newval)
+{
+	netdev_info(bond->dev, "Setting LACP bypass to %s (%llu)\n",
+		    newval->string, newval->value);
+	bond->params.lacp_bypass = newval->value;
+
+	return 0;
+}
+
+static int bond_option_lacp_bypass_timeout_set(struct bonding *bond,
+					const struct bond_opt_value *newval)
+{
+	netdev_info(bond->dev, "Setting LACP bypass timeout to %llu\n",
+		    newval->value);
+	bond->params.lacp_bypass_timeout = newval->value;
 
 	return 0;
 }
