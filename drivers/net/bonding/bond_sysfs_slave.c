@@ -17,16 +17,18 @@
 struct slave_attribute {
 	struct attribute attr;
 	ssize_t (*show)(struct slave *, char *);
+	int (*store)(struct slave *, unsigned long);
 };
 
-#define SLAVE_ATTR(_name, _mode, _show)				\
+#define SLAVE_ATTR(_name, _mode, _show, _store)			\
 const struct slave_attribute slave_attr_##_name = {		\
 	.attr = {.name = __stringify(_name),			\
 		 .mode = _mode },				\
 	.show	= _show,					\
-};
+	.store  = _store					\
+}
 #define SLAVE_ATTR_RO(_name) \
-	SLAVE_ATTR(_name, S_IRUGO, _name##_show)
+	SLAVE_ATTR(_name, S_IRUGO, _name##_show, NULL)
 
 static ssize_t state_show(struct slave *slave, char *buf)
 {
@@ -80,6 +82,21 @@ static ssize_t ad_aggregator_id_show(struct slave *slave, char *buf)
 }
 static SLAVE_ATTR_RO(ad_aggregator_id);
 
+static ssize_t bypass_priority_show(struct slave *slave, char *buf)
+{
+	return sprintf(buf, "%d\n", slave->bypass_priority);
+}
+
+static int bypass_priority_store(struct slave *slave,
+					unsigned long val)
+{
+	slave->bypass_priority = val;
+	return 0;
+}
+static SLAVE_ATTR(bypass_priority, S_IWUSR | S_IRUGO,
+		  bypass_priority_show,
+		  bypass_priority_store);
+
 static const struct slave_attribute *slave_attrs[] = {
 	&slave_attr_state,
 	&slave_attr_mii_status,
@@ -87,6 +104,7 @@ static const struct slave_attribute *slave_attrs[] = {
 	&slave_attr_perm_hwaddr,
 	&slave_attr_queue_id,
 	&slave_attr_ad_aggregator_id,
+	&slave_attr_bypass_priority,
 	NULL
 };
 
@@ -102,8 +120,33 @@ static ssize_t slave_show(struct kobject *kobj,
 	return slave_attr->show(slave, buf);
 }
 
+static ssize_t slave_store(struct kobject *kobj,
+			   struct attribute *attr,
+			   const char *buf, size_t count)
+{
+	struct slave_attribute *slave_attr = to_slave_attr(attr);
+	struct slave *slave = to_slave(kobj);
+	ssize_t ret = -EINVAL;
+	char *endp;
+	unsigned long val;
+
+	val = simple_strtoul(buf, &endp, 0);
+	if (endp != buf) {
+		if (!rtnl_trylock())
+			return restart_syscall();
+		if (slave_attr->store) {
+			ret = slave_attr->store(slave, val);
+			if (ret == 0)
+				ret = count;
+		}
+		rtnl_unlock();
+	}
+	return ret;
+}
+
 static const struct sysfs_ops slave_sysfs_ops = {
 	.show = slave_show,
+	.store = slave_store,
 };
 
 static struct kobj_type slave_ktype = {
