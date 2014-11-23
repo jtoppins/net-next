@@ -116,6 +116,8 @@ static const struct nla_policy bond_policy[IFLA_BOND_MAX + 1] = {
 	[IFLA_BOND_AD_USER_PORT_KEY]	= { .type = NLA_U16 },
 	[IFLA_BOND_AD_ACTOR_SYSTEM]	= { .type = NLA_BINARY,
 					    .len  = ETH_ALEN },
+	[IFLA_BOND_AD_LACP_BYPASS]	= { .type = NLA_U8 },
+	[IFLA_BOND_AD_LACP_BYPASS_TIMEOUT] = { .type = NLA_U32 },
 };
 
 static const struct nla_policy bond_slave_policy[IFLA_BOND_SLAVE_MAX + 1] = {
@@ -393,6 +395,26 @@ static int bond_changelink(struct net_device *bond_dev,
 		if (err)
 			return err;
 	}
+	if (data[IFLA_BOND_AD_LACP_BYPASS]) {
+		int lacp_bypass =
+			nla_get_u8(data[IFLA_BOND_AD_LACP_BYPASS]);
+
+		bond_opt_initval(&newval, lacp_bypass);
+		err = __bond_opt_set(bond, BOND_OPT_LACP_BYPASS, &newval);
+		if (err)
+			return err;
+	}
+	if (data[IFLA_BOND_AD_LACP_BYPASS_TIMEOUT]) {
+		int bypass_timeout =
+			nla_get_u32(data[IFLA_BOND_AD_LACP_BYPASS_TIMEOUT]);
+
+		bond_opt_initval(&newval, bypass_timeout);
+		err = __bond_opt_set(bond, BOND_OPT_LACP_BYPASS_TIMEOUT,
+				     &newval);
+		if (err)
+			return err;
+	}
+
 	if (data[IFLA_BOND_AD_SELECT]) {
 		int ad_select =
 			nla_get_u8(data[IFLA_BOND_AD_SELECT]);
@@ -482,6 +504,8 @@ static size_t bond_get_size(const struct net_device *bond_dev)
 		nla_total_size(sizeof(u16)) + /* IFLA_BOND_AD_ACTOR_SYS_PRIO */
 		nla_total_size(sizeof(u16)) + /* IFLA_BOND_AD_USER_PORT_KEY */
 		nla_total_size(ETH_ALEN) + /* IFLA_BOND_AD_ACTOR_SYSTEM */
+		nla_total_size(sizeof(u8)) +  /* IFLA_BOND_AD_LACP_BYPASS */
+		nla_total_size(sizeof(u32)) + /* IFLA_BOND_AD_LACP_BYPASS_TIMEOUT */
 		0;
 }
 
@@ -598,6 +622,14 @@ static int bond_fill_info(struct sk_buff *skb,
 
 	if (nla_put_u8(skb, IFLA_BOND_AD_LACP_RATE,
 		       bond->params.lacp_fast))
+		goto nla_put_failure;
+
+	if (nla_put_u8(skb, IFLA_BOND_AD_LACP_BYPASS,
+		       bond->params.lacp_bypass))
+		goto nla_put_failure;
+
+	if (nla_put_u32(skb, IFLA_BOND_AD_LACP_BYPASS_TIMEOUT,
+		       bond->params.lacp_bypass_timeout))
 		goto nla_put_failure;
 
 	if (nla_put_u8(skb, IFLA_BOND_AD_SELECT,
