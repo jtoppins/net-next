@@ -124,6 +124,7 @@ struct bond_params {
 	int updelay;
 	int downdelay;
 	int lacp_fast;
+	int lacp_bypass;
 	unsigned int min_links;
 	int ad_select;
 	char primary[IFNAMSIZ];

@@ -60,6 +60,8 @@ static int bond_option_pps_set(struct bonding *bond,
 			       const struct bond_opt_value *newval);
 static int bond_option_lacp_rate_set(struct bonding *bond,
 				     const struct bond_opt_value *newval);
+static int bond_option_lacp_bypass_set(struct bonding *bond,
+					 const struct bond_opt_value *newval);
 static int bond_option_ad_select_set(struct bonding *bond,
 				     const struct bond_opt_value *newval);
 static int bond_option_queue_id_set(struct bonding *bond,
@@ -138,6 +140,12 @@ static const struct bond_opt_value bond_lacp_rate_tbl[] = {
 	{ "slow", AD_LACP_SLOW, 0},
 	{ "fast", AD_LACP_FAST, 0},
 	{ NULL,   -1,           0},
+};
+
+static const struct bond_opt_value bond_lacp_bypass_tbl[] = {
+	{ "off", 0,  BOND_VALFLAG_DEFAULT},
+	{ "on",  1,  0},
+	{ NULL,  -1, 0}
 };
 
 static const struct bond_opt_value bond_ad_select_tbl[] = {
@@ -420,6 +428,15 @@ static const struct bond_option bond_opts[BOND_OPT_LAST] = {
 		.flags = BOND_OPTFLAG_IFDOWN,
 		.values = bond_ad_user_port_key_tbl,
 		.set = bond_option_ad_user_port_key_set,
+	},
+	[BOND_OPT_LACP_BYPASS] = {
+		.id = BOND_OPT_LACP_BYPASS,
+		.name = "lacp_bypass",
+		.desc = "LACP bond allow switch to bring up bond before"
+		        " any LACP PDUs are received",
+		.unsuppmodes = BOND_MODE_ALL_EX(BIT(BOND_MODE_8023AD)),
+		.values = bond_lacp_bypass_tbl,
+		.set = bond_option_lacp_bypass_set
 	}
 };
 
@@ -1260,6 +1277,16 @@ static int bond_option_lacp_rate_set(struct bonding *bond,
 		    newval->string, newval->value);
 	bond->params.lacp_fast = newval->value;
 	bond_3ad_update_lacp_rate(bond);
+
+	return 0;
+}
+
+static int bond_option_lacp_bypass_set(struct bonding *bond,
+					 const struct bond_opt_value *newval)
+{
+	netdev_info(bond->dev, "Setting LACP bypass to %s (%llu)\n",
+		    newval->string, newval->value);
+	bond->params.lacp_bypass = newval->value;
 
 	return 0;
 }
