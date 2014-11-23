@@ -28,6 +28,7 @@ static size_t bond_get_slave_size(const struct net_device *bond_dev,
 		nla_total_size(MAX_ADDR_LEN) +	/* IFLA_BOND_SLAVE_PERM_HWADDR */
 		nla_total_size(sizeof(u16)) +	/* IFLA_BOND_SLAVE_QUEUE_ID */
 		nla_total_size(sizeof(u16)) +	/* IFLA_BOND_SLAVE_AD_AGGREGATOR_ID */
+		nla_total_size(sizeof(u32)) +	/* IFLA_BOND_SLAVE_LACP_BYPASS_PRIORITY */
 		0;
 }
 
@@ -52,6 +53,10 @@ static int bond_fill_slave_info(struct sk_buff *skb,
 		goto nla_put_failure;
 
 	if (nla_put_u16(skb, IFLA_BOND_SLAVE_QUEUE_ID, slave->queue_id))
+		goto nla_put_failure;
+
+	if (nla_put_u32(skb, IFLA_BOND_SLAVE_BYPASS_PRIORITY,
+			slave->bypass_priority))
 		goto nla_put_failure;
 
 	if (BOND_MODE(slave->bond) == BOND_MODE_8023AD) {
@@ -98,6 +103,7 @@ static const struct nla_policy bond_policy[IFLA_BOND_MAX + 1] = {
 
 static const struct nla_policy bond_slave_policy[IFLA_BOND_SLAVE_MAX + 1] = {
 	[IFLA_BOND_SLAVE_QUEUE_ID]	= { .type = NLA_U16 },
+	[IFLA_BOND_SLAVE_BYPASS_PRIORITY] = { .type = NLA_U32 },
 };
 
 static int bond_validate(struct nlattr *tb[], struct nlattr *data[])

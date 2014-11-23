@@ -220,6 +220,8 @@ static void bond_info_show_slave(struct seq_file *seq,
 		} else {
 			seq_puts(seq, "Aggregator ID: N/A\n");
 		}
+		seq_printf(seq, "LACP bypass priority: %d\n",
+			   slave->bypass_priority);
 	}
 }
 
