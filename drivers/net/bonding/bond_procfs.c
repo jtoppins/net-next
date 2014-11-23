@@ -160,6 +160,9 @@ static void bond_info_show_master(struct seq_file *seq)
 					   ad_info.partner_system);
 			}
 		}
+		seq_printf(seq, "Bypass Info:\n");
+		seq_printf(seq, "\tEnabled: %d\n",
+			   bond->params.lacp_bypass);
 	}
 }
 

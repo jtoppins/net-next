@@ -99,6 +99,7 @@ static char *mode;
 static char *primary;
 static char *primary_reselect;
 static char *lacp_rate;
+static char *lacp_bypass;
 static int min_links;
 static char *ad_select;
 static char *xmit_hash_policy;
@@ -151,6 +152,8 @@ MODULE_PARM_DESC(primary_reselect, "Reselect primary slave "
 module_param(lacp_rate, charp, 0);
 MODULE_PARM_DESC(lacp_rate, "LACPDU tx rate to request from 802.3ad partner; "
 			    "0 for slow, 1 for fast");
+module_param(lacp_bypass, charp, 0);
+MODULE_PARM_DESC(lacp_bypass, "LACP bypass link partner negotiation; 1 to enable, 0 to disable");
 module_param(ad_select, charp, 0);
 MODULE_PARM_DESC(ad_select, "803.ad aggregation selection logic; "
 			    "0 for stable (default), 1 for bandwidth, "
@@ -4203,6 +4206,25 @@ static int bond_check_params(struct bond_params *params)
 			}
 			lacp_fast = valptr->value;
 		}
+	}
+
+	if (lacp_bypass) {
+		if (bond_mode != BOND_MODE_8023AD) {
+			pr_info("lacp_bypass param is irrelevant in mode %s\n",
+				bond_mode_name(bond_mode));
+		} else {
+			bond_opt_initstr(&newval, lacp_bypass);
+			valptr = bond_opt_parse(bond_opt_get(BOND_OPT_LACP_BYPASS),
+						&newval);
+			if (!valptr) {
+				pr_err("Error: Invalid lacp bypass \"%s\"\n",
+				       lacp_bypass);
+				return -EINVAL;
+			}
+			params->lacp_bypass = valptr->value;
+		}
+	} else {
+		params->lacp_bypass = 0;
 	}
 
 	if (ad_select) {
