@@ -55,7 +55,9 @@ typedef enum {
 	AD_RX_LACP_DISABLED,	/* rx Machine */
 	AD_RX_EXPIRED,		/* rx Machine */
 	AD_RX_DEFAULTED,	/* rx Machine */
-	AD_RX_CURRENT		/* rx Machine */
+	AD_RX_CURRENT,		/* rx Machine */
+	AD_RX_BYPASS,		/* rx Machine */
+	AD_RX_BYPASS_EXPIRED	/* rx Machine */
 } rx_states_t;
 
 /* periodic machine states(43.4.12 in the 802.3ad standard) */
@@ -107,7 +109,8 @@ typedef enum {
 	AD_ACTOR_CHURN_TIMER,
 	AD_PERIODIC_TIMER,
 	AD_PARTNER_CHURN_TIMER,
-	AD_WAIT_WHILE_TIMER
+	AD_WAIT_WHILE_TIMER,
+	AD_BYPASS_TIMER,
 } ad_timers_t;
 
 #pragma pack(1)
@@ -230,6 +233,7 @@ typedef struct port {
 	u16 sm_vars;		/* all state machines variables for this port */
 	rx_states_t sm_rx_state;	/* state machine rx state */
 	u16 sm_rx_timer_counter;	/* state machine rx timer counter */
+	u16 sm_rx_bypass_timer_counter;	/* state machine rx bypass timer counter */
 	periodic_states_t sm_periodic_state;	/* state machine periodic state */
 	u16 sm_periodic_timer_counter;	/* state machine periodic timer counter */
 	mux_states_t sm_mux_state;	/* state machine mux state */
