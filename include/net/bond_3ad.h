@@ -55,7 +55,8 @@ typedef enum {
 	AD_RX_LACP_DISABLED,	/* rx Machine */
 	AD_RX_EXPIRED,		/* rx Machine */
 	AD_RX_DEFAULTED,	/* rx Machine */
-	AD_RX_CURRENT		/* rx Machine */
+	AD_RX_CURRENT,		/* rx Machine */
+	AD_RX_BYPASS,		/* rx Machine */
 } rx_states_t;
 
 /* periodic machine states(43.4.12 in the 802.3ad standard) */
@@ -307,5 +308,6 @@ int bond_3ad_lacpdu_recv(const struct sk_buff *skb, struct bonding *bond,
 			 struct slave *slave);
 int bond_3ad_set_carrier(struct bonding *bond);
 void bond_3ad_update_lacp_rate(struct bonding *bond);
+bool bond_3ad_in_bypass_state(struct net_device *dev);
 #endif /* _NET_BOND_3AD_H */
 
