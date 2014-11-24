@@ -182,8 +182,9 @@ static void bond_info_show_slave(struct seq_file *seq,
 			= SLAVE_AD_INFO(slave)->port.aggregator;
 
 		if (agg)
-			seq_printf(seq, "Aggregator ID: %d\n",
-				   agg->aggregator_identifier);
+			seq_printf(seq, "Aggregator ID: %d (%s)\n",
+				   agg->aggregator_identifier,
+				   agg->is_active ? "active" : "inactive");
 		else
 			seq_puts(seq, "Aggregator ID: N/A\n");
 	}
