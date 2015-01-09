@@ -430,13 +430,27 @@ const struct bond_opt_value *bond_opt_get_val(unsigned int option, u64 val)
 	const struct bond_option *opt;
 	int i;
 
+	printk(KERN_EMERG "%s:%d - Paramlist: option: %llu - val: %llu\n", __FILE__, __LINE__, (long long unsigned int) option, (long long unsigned int) val);
+	printk(KERN_EMERG "%s:%d - BOND_OPT_LACP_BYPASS: %d - sizeof(struct bond_option): %lu - bond_opts: %pk - &bond_opts[option]: %pk\n", __FILE__, __LINE__, BOND_OPT_LACP_BYPASS, sizeof(struct bond_option), bond_opts, &bond_opts[option]);
+	for (i = 0; i < BOND_OPT_LAST; i++)
+		printk(KERN_EMERG "%s:%d bond_opts[%d].name: %s\n", __FILE__, __LINE__, i, bond_opts[i].name);
+
 	opt = bond_opt_get(option);
+
+	printk(KERN_EMERG "%s:%d opt: %pk - bond_lacp_bypass_tbl: %pk\n", __FILE__, __LINE__, opt, bond_lacp_bypass_tbl);
+	printk(KERN_EMERG "%s:%d bond_option members {(id : %d) (name : '%s') (values : %pk)}", __FILE__, __LINE__, opt->id, opt->name, opt->values);
 	if (WARN_ON(!opt))
 		return NULL;
-	for (i = 0; opt->values && opt->values[i].string; i++)
-		if (opt->values[i].value == val)
+	for (i = 0; opt->values && opt->values[i].string; i++) {
+		printk(KERN_EMERG "%s:%d testing val: %llu\n", __FILE__, __LINE__, opt->values[i].value);
+		if (opt->values[i].value == val) {
+			printk(KERN_EMERG "%s:%d found val: %llu\n", __FILE__, __LINE__, opt->values[i].value);
 			return &opt->values[i];
+		}
+	}
 
+	printk(KERN_EMERG "%s:%d NOTHING FOUND WARN!\n", __FILE__, __LINE__);
+	WARN_ON(true);
 	return NULL;
 }
 

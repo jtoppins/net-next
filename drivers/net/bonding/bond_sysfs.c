@@ -363,8 +363,13 @@ static ssize_t bonding_show_lacp_bypass(struct device *d,
 	struct bonding *bond = to_bond(d);
 	const struct bond_opt_value *val;
 
+	printk(KERN_EMERG "%s:%d Paramlist:  d: 0x%pk - attr: 0x%pk -"
+		" buf: 0x%pk - bond: 0x%pk\n", __FILE__, __LINE__, d,
+	        attr, buf, bond);
+	printk(KERN_EMERG "%s:%d got here\n", __FILE__, __LINE__);
 	val = bond_opt_get_val(BOND_OPT_LACP_BYPASS,
 			       bond->params.lacp_bypass);
+	printk(KERN_EMERG "%s:%d got here, val: 0x%pk - lacp_bypass: %d\n", __FILE__, __LINE__, val, bond->params.lacp_bypass);
 
 	return sprintf(buf, "%s %d\n", val->string,
 		       bond->params.lacp_bypass);

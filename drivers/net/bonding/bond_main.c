@@ -4118,8 +4118,10 @@ static int bond_check_params(struct bond_params *params)
 				return -EINVAL;
 			}
 			params->lacp_bypass = valptr->value;
+			printk(KERN_EMERG "%s: (set case) set lacp_bypass to %d\n", __FUNCTION__, params->lacp_bypass);
 		}
 	} else {
+		printk(KERN_EMERG "%s: (else case) set lacp_bypass to 0\n", __FUNCTION__);
 		params->lacp_bypass = 0;
 	}
 
