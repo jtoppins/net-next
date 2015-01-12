@@ -3149,6 +3149,15 @@ static int bond_open(struct net_device *bond_dev)
 				bond_set_slave_inactive_flags(slave,
 							      BOND_SLAVE_NOTIFY_NOW);
 			} else if (BOND_MODE(bond) != BOND_MODE_8023AD) {
+				/* reset the port state machine for each slave
+				 * and set aggregator to inactive.
+				 */
+				if (SLAVE_AD_INFO(slave)) {
+					SLAVE_AD_INFO(slave)->port.sm_vars |= 0x1;
+					SLAVE_AD_INFO(slave)->aggregator.is_active =
+						false;
+				}
+			} else {
 				bond_set_slave_active_flags(slave,
 							    BOND_SLAVE_NOTIFY_NOW);
 			}
