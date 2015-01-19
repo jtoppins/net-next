@@ -1282,6 +1282,7 @@ static void ad_port_selection_logic(struct port *port, bool *update_slave_arr)
 				port->aggregator = NULL;
 				port->next_port_in_aggregator = NULL;
 				port->actor_port_aggregator_identifier = 0;
+				__disable_port(port);
 
 				netdev_dbg(bond->dev, "Port %d left LAG %d\n",
 					   port->actor_port_number,
@@ -1831,14 +1832,19 @@ void bond_3ad_initiate_agg_selection(struct bonding *bond, int timeout)
  */
 void bond_3ad_initialize(struct bonding *bond, u16 tick_resolution)
 {
+	/* If user configured a sys_mac, use it */
+	struct mac_addr *sys_mac = (struct mac_addr *)bond->dev->dev_addr;
+	if (MAC_ADDRESS_COMPARE(&(bond->params.sys_mac_addr), &(null_mac_addr)))
+		sys_mac = (struct mac_addr *)&(bond->params.sys_mac_addr);
+
 	/* check that the bond is not initialized yet */
 	if (!MAC_ADDRESS_EQUAL(&(BOND_AD_INFO(bond).system.sys_mac_addr),
-				bond->dev->dev_addr)) {
+				sys_mac)) {
 
 		BOND_AD_INFO(bond).aggregator_identifier = 0;
 
-		BOND_AD_INFO(bond).system.sys_priority = 0xFFFF;
-		BOND_AD_INFO(bond).system.sys_mac_addr = *((struct mac_addr *)bond->dev->dev_addr);
+		BOND_AD_INFO(bond).system.sys_priority = bond->params.sys_priority;
+		BOND_AD_INFO(bond).system.sys_mac_addr = *sys_mac;
 
 		/* initialize how many times this module is called in one
 		 * second (should be about every 100ms)
@@ -2490,5 +2496,72 @@ void bond_3ad_update_lacp_rate(struct bonding *bond)
 		else
 			port->actor_oper_port_state &= ~AD_STATE_LACP_TIMEOUT;
 	}
+	spin_unlock_bh(&bond->mode_lock);
+}
+
+/*
+ * When modify sys_priority parameter via sysfs,
+ * update the bond's sys_priority and the
+ * actor_system_priority of each port.
+ *
+ * Hold slave->state_machine_lock,
+ * so we can modify port->actor_system_priority
+ * no matter bond is up or down.
+ */
+void bond_3ad_update_sys_priority(struct bonding *bond)
+{
+	int i;
+	struct slave *slave;
+	struct port *port = NULL;
+	u16 sys_priority;
+
+	spin_lock_bh(&bond->mode_lock);
+	sys_priority = bond->params.sys_priority;
+	BOND_AD_INFO(bond).system.sys_priority = sys_priority;
+
+	bond_for_each_slave(bond, slave, i) {
+		port = &(SLAVE_AD_INFO(slave).port);
+		if (port->slave == NULL)
+			continue;
+		__get_state_machine_lock(port);
+		port->actor_system_priority = sys_priority;
+		__release_state_machine_lock(port);
+	}
+
+	spin_unlock_bh(&bond->mode_lock);
+}
+
+/*
+ * When modify sys_mac_addr parameter via sysfs,
+ * update the bond's sys_mac_addr and the
+ * actor_system of each port.
+ *
+ * Hold slave->state_machine_lock,
+ * so we can modify port->actor_system
+ * no matter bond is up or down.
+ */
+void bond_3ad_update_sys_mac_addr(struct bonding *bond)
+{
+	int i;
+	struct slave *slave;
+	struct port *port = NULL;
+	struct mac_addr sys_mac;
+
+	spin_lock_bh(&bond->mode_lock);
+	sys_mac = *((struct mac_addr *)&(bond->params.sys_mac_addr));
+	if (!MAC_ADDRESS_COMPARE(&(sys_mac), &(null_mac_addr))){
+		sys_mac = *((struct mac_addr *)bond->dev->dev_addr);
+	}
+	BOND_AD_INFO(bond).system.sys_mac_addr = sys_mac;
+
+	bond_for_each_slave(bond, slave, i) {
+		port = &(SLAVE_AD_INFO(slave).port);
+		if (port->slave == NULL)
+			continue;
+		__get_state_machine_lock(port);
+		port->actor_system = sys_mac;
+		__release_state_machine_lock(port);
+	}
+
 	spin_unlock_bh(&bond->mode_lock);
 }

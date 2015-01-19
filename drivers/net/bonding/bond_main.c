@@ -4362,6 +4362,8 @@ static int bond_check_params(struct bond_params *params)
 	params->downdelay = downdelay;
 	params->use_carrier = use_carrier;
 	params->lacp_fast = lacp_fast;
+	params->sys_priority = 0xFFFF;
+	memset(&params->sys_mac_addr, 0, sizeof(params->sys_mac_addr));
 	params->primary[0] = 0;
 	params->primary_reselect = primary_reselect_value;
 	params->fail_over_mac = fail_over_mac_value;
