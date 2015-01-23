@@ -2404,8 +2404,10 @@ void bond_3ad_handle_link_change(struct slave *slave, char link)
 int bond_3ad_set_carrier(struct bonding *bond)
 {
 	struct aggregator *active;
-	struct slave *first_slave;
+	struct slave *first_slave, *slave;
+	struct list_head *iter;
 	int ret = 1;
+	int active_slaves = 0;
 
 	rcu_read_lock();
 	first_slave = bond_first_slave_rcu(bond);
@@ -2413,10 +2415,15 @@ int bond_3ad_set_carrier(struct bonding *bond)
 		ret = 0;
 		goto out;
 	}
+
+	bond_for_each_slave_rcu(bond, slave, iter)
+		if (SLAVE_AD_INFO(slave)->aggregator.is_avtive)
+			active_slaves++;
+
 	active = __get_active_agg(&(SLAVE_AD_INFO(first_slave)->aggregator));
-	if (active) {
+	if (active && __agg_has_partner(active)) {
 		/* are enough slaves available to consider link up? */
-		if (active->num_of_ports < bond->params.min_links) {
+		if (active_slaves < bond->params.min_links) {
 			if (netif_carrier_ok(bond->dev)) {
 				netif_carrier_off(bond->dev);
 				goto out;
