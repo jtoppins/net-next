@@ -2328,6 +2328,14 @@ static int igb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (err)
 		goto err_sw_init;
 
+	/* Initialize link properties that are user-changeable */
+	adapter->fc_autoneg = true;
+	hw->mac.autoneg = true;
+	hw->phy.autoneg_advertised = 0x2f;
+
+	hw->fc.requested_mode = e1000_fc_default;
+	hw->fc.current_mode = e1000_fc_default;
+
 	/* setup the private structure */
 	err = igb_sw_init(adapter);
 	if (err)
@@ -2448,14 +2456,6 @@ static int igb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	INIT_WORK(&adapter->reset_task, igb_reset_task);
 	INIT_WORK(&adapter->watchdog_task, igb_watchdog_task);
-
-	/* Initialize link properties that are user-changeable */
-	adapter->fc_autoneg = true;
-	hw->mac.autoneg = true;
-	hw->phy.autoneg_advertised = 0x2f;
-
-	hw->fc.requested_mode = e1000_fc_default;
-	hw->fc.current_mode = e1000_fc_default;
 
 	igb_validate_mdi_setting(hw);
 
