@@ -218,7 +218,7 @@ static s32 igb_init_phy_params_82575(struct e1000_hw *hw)
 	/* Set phy->phy_addr and phy->id. */
 	ret_val = igb_get_phy_id_82575(hw);
 	if (ret_val)
-		return ret_val;
+		goto out;
 
 	/* Verify phy id and set remaining function pointers */
 	switch (phy->id) {
@@ -287,8 +287,8 @@ static s32 igb_init_phy_params_82575(struct e1000_hw *hw)
 		phy->ops.force_speed_duplex = igb_phy_force_speed_duplex_m88;
 		break;
 	default:
-		ret_val = -E1000_ERR_PHY;
-		goto out;
+		phy->type = e1000_phy_generic;
+		break;
 	}
 
 out:
