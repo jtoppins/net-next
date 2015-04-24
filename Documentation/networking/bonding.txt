@@ -927,6 +927,23 @@ lp_interval
 	The valid range is 1 - 0x7fffffff; the default value is 1. This Option
 	has effect only in balance-tlb and balance-alb modes.
 
+lacp_bypass
+
+	Specifies if bond members are allowed to be put into bypass mode. This
+	is needed when a Linux device is used as a switch and the host is
+	connected by a bond to this swtich but the host needs to PXEBoot before
+	the LAG can be established. Possible values are:
+
+	off or 0
+		Bonding members will not be allowed to go into bypass, thus breaking
+		PXEBoot for some servers that don't support LACP.
+
+	on or 1
+		Bonding members will be allowed to go into bypass according to their
+		slave priority.
+
+lacp_bypass_timeout
+
 3. Configuring Bonding Devices
 ==============================
 
