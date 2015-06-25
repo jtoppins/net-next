@@ -428,11 +428,12 @@ static const struct bond_option bond_opts[BOND_OPT_LAST] = {
 		.flags = BOND_OPTFLAG_IFDOWN,
 		.values = bond_ad_user_port_key_tbl,
 		.set = bond_option_ad_user_port_key_set,
+	},
 	[BOND_OPT_LACP_BYPASS] = {
 		.id = BOND_OPT_LACP_BYPASS,
 		.name = "lacp_bypass",
 		.desc = "LACP bond allow switch to bring up bond before"
-		        " and LACP PDUs are received",
+		        " any LACP PDUs are received",
 		.unsuppmodes = BOND_MODE_ALL_EX(BIT(BOND_MODE_8023AD)),
 		.values = bond_lacp_bypass_tbl,
 		.set = bond_option_lacp_bypass_set
