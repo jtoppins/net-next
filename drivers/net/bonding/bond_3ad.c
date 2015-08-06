@@ -354,126 +354,6 @@ static u8 __get_duplex(struct port *port)
 	return retval;
 }
 
-/**
- * is_lacp_bypass_eligible - is bond eligible to go into lacp bypass mode
- * @bond: the bond we're looking at
- *
- * Return true if it is, false otherwise
- */
-static bool is_lacp_bypass_eligible(struct bonding *bond)
-{
-	return !!(bond->params.lacp_bypass);
-}
-
-/**
- * is_better_bypass_slave - compare between two slaves of the same bond
- *                            and see which one is better for lacp bypass
- * @slave1
- * @slave2
- *
- * Return: true if slave1 is better, false otherwise
- */
-static bool is_better_bypass_slave(struct slave *slave1,
-				     struct slave *slave2)
-{
-	if (!slave1)
-		return false;
-
-	if (!slave2)
-		return true;
-
-	if (slave1->bond != slave2->bond)
-		return false;
-
-	return strcmp(slave1->dev->name, slave2->dev->name) <= 0;
-}
-
-/**
- * __get_best_bypass_slave_in_bond - get the best slave when bond is in
- *                                     bypass mode
- * @bond: the bond we're looking at
- * Return the slave in the bond which is best for lacp bypass
- */
-static struct slave *__get_best_bypass_slave_in_bond(struct bonding *bond)
-{
-	struct slave *slave, *best_slave = NULL;
-	struct list_head *iter;
-
-	if (!is_lacp_bypass_eligible(bond))
-		return NULL;
-
-	bond_for_each_slave(bond, slave, iter) {
-		if (bond_slave_is_up(slave)) {
-			if (!best_slave)
-				best_slave = slave;
-			else if (is_better_bypass_slave(slave, best_slave))
-				best_slave = slave;
-		}
-	}
-	return best_slave;
-}
-
-static struct slave *__get_best_bypass_slave_in_agg(struct aggregator *agg)
-{
-	struct slave *best_slave = NULL;
-	struct port *port;
-
-	if (!is_lacp_bypass_eligible(agg->slave->bond))
-	  return NULL;
-
-	for (port = agg->lag_ports;
-	     port;
-	     port = port->next_port_in_aggregator) {
-
-		if (bond_slave_is_up(port->slave)) {
-			if (!best_slave)
-				best_slave = port->slave;
-			else if (is_better_bypass_slave(port->slave,
-							  best_slave))
-				best_slave = port->slave;
-		}
-	}
-	return best_slave;
-}
-
-/**
- * is_best_bypass_slave - is the given slave the best for lacp bypass
- * @slave: the slave we're looking at
- * Return true if it is, false otherwise
- */
-static bool is_best_bypass_slave(struct slave *slave)
-{
-	return slave == __get_best_bypass_slave_in_bond(slave->bond);
-}
-
-static bool is_agg_in_bypass(struct aggregator *agg)
-{
-	struct slave *slave;
-
-	if (!agg)
-		return false;
-
-	slave = __get_best_bypass_slave_in_agg(agg);
-	return slave &&
-		(SLAVE_AD_INFO(slave)->port.sm_vars & AD_PORT_BYPASS);
-}
-
-bool bond_3ad_in_bypass_state(const struct net_device *dev)
-{
-	struct slave *slave;
-	struct bonding *bond = netdev_priv(dev);
-	struct list_head *iter;
-
-	if (!bond)
-		return false;
-
-	bond_for_each_slave(bond, slave, iter) {
-		if (SLAVE_AD_INFO(slave)->port.sm_vars & AD_PORT_BYPASS)
-			return true;
-	}
-	return false;
-}
-
 /* Conversions */
 
 /**
@@ -1176,13 +1056,6 @@ static void ad_rx_machine(struct lacpdu *lacpdu, struct port *port)
 			port->sm_rx_state = AD_RX_CURRENT;
 			/* bring down the bond, let lacp runs its course */
 			__disable_port(port);
-		} else if (!is_best_bypass_slave(port->slave) ||
-			   !(port->sm_vars & AD_PORT_BYPASS)) {
-			pr_debug("(%s) bypass %d or no longer best\n",
-			    port->slave->dev->name,
-			    port->slave->bond->params.lacp_bypass);
-			port->sm_rx_state = AD_RX_DEFAULTED;
-			__disable_port(port);
 		} else if ((port->sm_vars & AD_PORT_BYPASS) != AD_PORT_BYPASS) {
 			pr_debug("%s: lacp bypass has been cancelled\n",
 				 port->slave->dev->name);
@@ -1195,10 +1068,7 @@ static void ad_rx_machine(struct lacpdu *lacpdu, struct port *port)
 		    !(--port->sm_rx_timer_counter)) {
 			switch (port->sm_rx_state) {
 			case AD_RX_EXPIRED:
-				if (is_best_bypass_slave(port->slave))
-					port->sm_rx_state = AD_RX_BYPASS;
-				else
-					port->sm_rx_state = AD_RX_DEFAULTED;
+				port->sm_rx_state = AD_RX_DEFAULTED;
 				break;
 			case AD_RX_CURRENT:
 				port->sm_rx_state = AD_RX_EXPIRED;
@@ -1231,8 +1101,7 @@ static void ad_rx_machine(struct lacpdu *lacpdu, struct port *port)
 					if (!agg || is_agg_in_bypass(agg) ||
 					    agg == port->aggregator)
 						port->sm_rx_state = AD_RX_BYPASS;
-				} else if (is_best_bypass_slave(port->slave))
-					port->sm_rx_state = AD_RX_BYPASS;
+				}
 				break;
 			default:
 				break;
@@ -1266,17 +1135,13 @@ static void ad_rx_machine(struct lacpdu *lacpdu, struct port *port)
 			/* Fall Through */
 		case AD_RX_PORT_DISABLED:
 			port->sm_vars &= ~AD_PORT_MATCHED;
-			port->sm_vars &= ~AD_PORT_BYPASS;
-			port->slave->individual = 0;
 			break;
 		case AD_RX_LACP_DISABLED:
 			port->sm_vars &= ~AD_PORT_SELECTED;
-			port->sm_vars &= ~AD_PORT_BYPASS;
 			__record_default(port);
 			port->partner_oper.port_state &= ~AD_STATE_AGGREGATION;
 			port->sm_vars |= AD_PORT_MATCHED;
 			port->actor_oper_port_state &= ~AD_STATE_EXPIRED;
-			port->slave->individual = 0;
 			break;
 		case AD_RX_EXPIRED:
 			/* Reset of the Synchronization flag (Standard 43.4.12)
@@ -1287,13 +1152,11 @@ static void ad_rx_machine(struct lacpdu *lacpdu, struct port *port)
 			 */
 			port->partner_oper.port_state &= ~AD_STATE_SYNCHRONIZATION;
 			port->sm_vars &= ~AD_PORT_MATCHED;
-			port->sm_vars &= ~AD_PORT_BYPASS;
 			port->partner_oper.port_state |= AD_STATE_LACP_TIMEOUT;
 			port->partner_oper.port_state |= AD_STATE_LACP_ACTIVITY;
 			port->sm_rx_timer_counter = __ad_timer_to_ticks(AD_CURRENT_WHILE_TIMER, (u16)(AD_SHORT_TIMEOUT));
 			port->actor_oper_port_state |= AD_STATE_EXPIRED;
 			port->sm_vars |= AD_PORT_CHURNED;
-			port->slave->individual = 0;
 			break;
 		case AD_RX_DEFAULTED:
 			__update_default_selected(port);
@@ -1668,7 +1531,7 @@ static void ad_port_selection_logic(struct port *port, bool *update_slave_arr)
 		__enable_port(port);
 }
 
-/* Decide if "agg" is a better choice for the new active aggregator that
+/* Decide if "agg" is a better choice for the new active aggregator than
  * the current best, according to the ad_select policy.
  */
 static struct aggregator *ad_agg_selection_test(struct aggregator *best,
@@ -1693,11 +1556,10 @@ static struct aggregator *ad_agg_selection_test(struct aggregator *best,
 	 * 4.  Therefore, current and best both have partner replies or
 	 *     both do not, so:
 	 *
-	 * 4a. If both have no partner and bond is bypass eligible and if
-	 *     current agg is a better bypass slave, select current.
-	 *
-	 * 4b. If both have no partner and bond is bypass eligible and if
-	 *     best agg is a better bypass, keep best.
+	 * 4a. If both have no partner and bond is bypass eligible and both
+	 *     slaves are of equal weight so test which slave has link-up
+	 *     and choose that one. We test curr first if it has link up
+	 *     stick with it otherwise choose best.
 	 *
 	 * 5.  Therefore, current and best both have partner replies or
 	 *     both do not and bond is not bypass eligible, perform
@@ -1708,7 +1570,6 @@ static struct aggregator *ad_agg_selection_test(struct aggregator *best,
 	 *
 	 * BOND_AD_STABLE, BOND_AD_BANDWIDTH: Select by bandwidth.
 	 */
-	struct slave *s1, *s2;
 	if (!best)
 		return curr;
 
@@ -1726,13 +1587,7 @@ static struct aggregator *ad_agg_selection_test(struct aggregator *best,
 
 	if (is_lacp_bypass_eligible(curr->slave->bond) &&
 	    !__agg_has_partner(curr) && !__agg_has_partner(best)) {
-		s1 = __get_best_bypass_slave_in_agg(curr);
-		s2 = __get_best_bypass_slave_in_agg(best);
-
-		if (is_better_bypass_slave(s1, s2))
-			return curr;
-		if (is_better_bypass_slave(s2, s1))
-			return best;
+		/* what goes here ??? */
 	}
 
 	switch (__get_agg_selection_mode(curr->lag_ports)) {
@@ -1806,7 +1661,6 @@ static void ad_agg_selection_logic(struct aggregator *agg,
 	struct list_head *iter;
 	struct slave *slave;
 	struct port *port;
-	bool best_is_in_bypass = false;
 
 	rcu_read_lock();
 	origin = agg;
@@ -1822,9 +1676,7 @@ static void ad_agg_selection_logic(struct aggregator *agg,
 			best = ad_agg_selection_test(best, agg);
 	}
 
-	best_is_in_bypass = is_agg_in_bypass(best);
-
-	if (best && !best_is_in_bypass &&
+	if (best && !is_agg_in_bypass(best) &&
 	    __get_agg_selection_mode(best->lag_ports) == BOND_AD_STABLE) {
 		/* For the STABLE policy, don't replace the old active
 		 * aggregator if it's still active (it has an answering
@@ -1911,7 +1763,7 @@ static void ad_agg_selection_logic(struct aggregator *agg,
 	if (active) {
 		for (port = active->lag_ports; port;
 		     port = port->next_port_in_aggregator) {
-			if (is_best_bypass_slave(port->slave)) {
+			if (is_slave_in_bypass(port->slave)) {
 				pr_debug("(%s) agg active and no "
 					 "partner\n",
 					 port->slave->dev->name);
