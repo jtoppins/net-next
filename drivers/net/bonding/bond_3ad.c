@@ -458,7 +458,7 @@ static bool is_agg_in_bypass(struct aggregator *agg)
 		(SLAVE_AD_INFO(slave)->port.sm_vars & AD_PORT_BYPASS);
 }
 
-bool bond_3ad_in_bypass_state(struct net_device *dev)
+bool bond_3ad_in_bypass_state(const struct net_device *dev)
 {
 	struct slave *slave;
 	struct bonding *bond = netdev_priv(dev);

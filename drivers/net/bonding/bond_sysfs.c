@@ -357,8 +357,8 @@ static DEVICE_ATTR(lacp_rate, S_IRUGO | S_IWUSR,
 
 /* Show LACP bypass. */
 static ssize_t bonding_show_lacp_bypass(struct device *d,
-				 struct device_attribute *attr,
-				 char *buf)
+					struct device_attribute *attr,
+					char *buf)
 {
 	struct bonding *bond = to_bond(d);
 	const struct bond_opt_value *val;
@@ -371,6 +371,22 @@ static ssize_t bonding_show_lacp_bypass(struct device *d,
 }
 static DEVICE_ATTR(lacp_bypass, S_IRUGO | S_IWUSR,
 		   bonding_show_lacp_bypass, bonding_sysfs_store_option);
+
+static ssize_t bonding_show_lacp_bypass_active(struct device *d,
+					       struct device_attribute *attr,
+					       char *buf)
+{
+	int count = 0;
+	struct net_device *dev = to_net_dev(d);
+	struct bonding *bond = to_bond(d);
+
+	if (BOND_MODE(bond) == BOND_MODE_8023AD)
+		count = sprintf(buf, "%d\n", bond_3ad_in_bypass_state(dev));
+
+	return count;
+}
+static DEVICE_ATTR(lacp_bypass_active, S_IRUGO,
+		   bonding_show_lacp_bypass_active, NULL);
 
 static ssize_t bonding_show_min_links(struct device *d,
 				      struct device_attribute *attr,
@@ -764,6 +780,7 @@ static struct attribute *per_bond_attrs[] = {
 	&dev_attr_updelay.attr,
 	&dev_attr_lacp_rate.attr,
 	&dev_attr_lacp_bypass.attr,
+	&dev_attr_lacp_bypass_active.attr,
 	&dev_attr_ad_select.attr,
 	&dev_attr_xmit_hash_policy.attr,
 	&dev_attr_num_grat_arp.attr,
