@@ -377,11 +377,10 @@ static ssize_t bonding_show_lacp_bypass_active(struct device *d,
 					       char *buf)
 {
 	int count = 0;
-	struct net_device *dev = to_net_dev(d);
 	struct bonding *bond = to_bond(d);
 
 	if (BOND_MODE(bond) == BOND_MODE_8023AD)
-		count = sprintf(buf, "%d\n", bond_3ad_in_bypass_state(dev));
+		count = sprintf(buf, "%d\n", bond_3ad_in_bypass(bond));
 
 	return count;
 }

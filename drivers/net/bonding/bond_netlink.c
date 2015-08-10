@@ -613,7 +613,7 @@ static int bond_fill_info(struct sk_buff *skb,
 
 	if (bond->params.lacp_bypass)
 		if (nla_put_u8(skb, IFLA_BOND_AD_LACP_BYPASS,
-				bond_3ad_in_bypass_state(bond_dev)))
+				bond_3ad_in_bypass(bond)))
 			goto nla_put_failure;
 
 	if (nla_put_u8(skb, IFLA_BOND_AD_SELECT,

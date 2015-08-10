@@ -27,7 +27,6 @@
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 #include <linux/if_ether.h>
-#include "net/bonding.h"
 
 /* General definitions */
 #define PKT_TYPE_LACPDU         cpu_to_be16(ETH_P_SLOW)
@@ -293,45 +292,6 @@ static inline const char *bond_3ad_churn_desc(churn_state_t state)
 	return churn_description[state];
 }
 
-/**
- * bond_3ad_is_bypass_enabled - is bond eligible to go into lacp bypass mode
- * @bond: the bond we're looking at
- *
- * Return true if enabled, false otherwise
- */
-static inline bool bond_3ad_is_bypass_enabled(const struct bonding *bond)
-{
-	return !!(bond->params.lacp_bypass);
-}
-
-/**
- * bond_3ad_in_bypass - not only check that bypass is enabled but check that
- *                      we are in bypass.
- * @bond: the bond we are looking at
- *
- * If any one slave in the bond has its state machine vars is in bypass, then
- * the bond is considered in bypass.
- *
- * Note: RCU read lock must be held
- *
- * Return true if enabled, false otherwise
- */
-static inline bool bond_3ad_in_bypass(const struct bonding *bond)
-{
-	struct slave *slave;
-	struct list_head *iter;
-
-	if (!bond)
-		return false;
-
-	if (!bond_3ad_is_bypass_enabled(bond))
-		return false;
-
-	bond_for_each_slave_rcu(bond, slave, iter)
-		if (SLAVE_AD_INFO(slave)->port.sm_vars & AD_PORT_BYPASS)
-			return true;
-	return false;
-}
 
 /* ========== AD Exported functions to the main bonding code ========== */
 void bond_3ad_initialize(struct bonding *bond, u16 tick_resolution);
@@ -349,5 +309,7 @@ int bond_3ad_lacpdu_recv(const struct sk_buff *skb, struct bonding *bond,
 			 struct slave *slave);
 int bond_3ad_set_carrier(struct bonding *bond);
 void bond_3ad_update_lacp_rate(struct bonding *bond);
+bool bond_3ad_is_bypass_enabled(struct bonding *bond);
+bool bond_3ad_in_bypass(struct bonding *bond);
 #endif /* _NET_BOND_3AD_H */
 

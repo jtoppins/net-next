@@ -760,6 +760,11 @@ static inline void __update_lacpdu_from_port(struct port *port)
 
 /* ================= main 802.3ad protocol code ========================= */
 
+static bool ad_slave_in_bypass(struct slave *slave)
+{
+	return slave && !!(SLAVE_AD_INFO(slave)->port.sm_vars & AD_PORT_BYPASS);
+}
+
 /**
  * ad_lacpdu_send - send out a lacpdu packet on a given port
  * @port: the port we're looking at
@@ -995,7 +1000,7 @@ static void ad_mux_machine(struct port *port, bool *update_slave_arr)
 	}
 }
 
-static void cancel_bypass_on_all_slaves(struct bonding *bond)
+static void ad_cancel_bypass(struct bonding *bond)
 {
 	struct list_head *iter;
 	struct slave *slave;
@@ -1009,7 +1014,6 @@ static void cancel_bypass_on_all_slaves(struct bonding *bond)
 		if (port->sm_vars & AD_PORT_BYPASS)
 			pr_info("%s: disabling lacp bypass\n", port->slave->dev->name);
 		port->sm_vars &= ~AD_PORT_BYPASS;
-		port->slave->individual = 0;
 	}
 }
 
@@ -1096,9 +1100,9 @@ static void ad_rx_machine(struct lacpdu *lacpdu, struct port *port)
 				break;
 			case AD_RX_DEFAULTED:
 				bond = __get_bond_by_port(port);
-				if (bond && is_lacp_bypass_eligible(bond)) {
+				if (bond && bond_3ad_is_bypass_enabled(bond)) {
 					agg = bond_3ad_get_active_agg(bond);
-					if (!agg || is_agg_in_bypass(agg) ||
+					if (!agg || ad_slave_in_bypass(agg->slave) ||
 					    agg == port->aggregator)
 						port->sm_rx_state = AD_RX_BYPASS;
 				}
@@ -1111,7 +1115,7 @@ static void ad_rx_machine(struct lacpdu *lacpdu, struct port *port)
 	}
 
 	if (lacpdu)
-		cancel_bypass_on_all_slaves(__get_bond_by_port(port));
+		ad_cancel_bypass(__get_bond_by_port(port));
 
 	/* check if the State machine was changed or new lacpdu arrived */
 	if ((port->sm_rx_state != last_state) || (lacpdu)) {
@@ -1164,7 +1168,6 @@ static void ad_rx_machine(struct lacpdu *lacpdu, struct port *port)
 			port->sm_vars |= AD_PORT_MATCHED;
 			port->sm_vars &= ~AD_PORT_BYPASS;
 			port->actor_oper_port_state &= ~AD_STATE_EXPIRED;
-			port->slave->individual = 0;
 			break;
 		case AD_RX_CURRENT:
 			/* detect loopback situation */
@@ -1181,14 +1184,12 @@ static void ad_rx_machine(struct lacpdu *lacpdu, struct port *port)
 			port->sm_rx_timer_counter = __ad_timer_to_ticks(AD_CURRENT_WHILE_TIMER, (u16)(port->actor_oper_port_state & AD_STATE_LACP_TIMEOUT));
 			port->actor_oper_port_state &= ~AD_STATE_EXPIRED;
 			port->sm_vars &= ~AD_PORT_BYPASS;
-			port->slave->individual = 0;
 			break;
 		case AD_RX_BYPASS:
 			pr_debug("rx_machine: in bypass state\n");
 			port->sm_vars &= ~AD_PORT_SELECTED;
 			port->sm_vars |= AD_PORT_BYPASS;
 			if (port->slave->bond->params.lacp_bypass) {
-				port->slave->individual = 1;
 				__enable_port(port);
 			}
 			break;
@@ -1527,7 +1528,7 @@ static void ad_port_selection_logic(struct port *port, bool *update_slave_arr)
 
 	if (!port->aggregator->is_active)
 		port->actor_oper_port_state &= ~AD_STATE_SYNCHRONIZATION;
-	if (port->slave->individual)
+	if (ad_slave_in_bypass(port->slave))
 		__enable_port(port);
 }
 
@@ -1585,7 +1586,7 @@ static struct aggregator *ad_agg_selection_test(struct aggregator *best,
 	if (!__agg_has_partner(curr) && __agg_has_partner(best))
 		return best;
 
-	if (is_lacp_bypass_eligible(curr->slave->bond) &&
+	if (bond_3ad_is_bypass_enabled(curr->slave->bond) &&
 	    !__agg_has_partner(curr) && !__agg_has_partner(best)) {
 		/* what goes here ??? */
 	}
@@ -1676,7 +1677,7 @@ static void ad_agg_selection_logic(struct aggregator *agg,
 			best = ad_agg_selection_test(best, agg);
 	}
 
-	if (best && !is_agg_in_bypass(best) &&
+	if (best && !ad_slave_in_bypass(best->slave) &&
 	    __get_agg_selection_mode(best->lag_ports) == BOND_AD_STABLE) {
 		/* For the STABLE policy, don't replace the old active
 		 * aggregator if it's still active (it has an answering
@@ -1744,10 +1745,9 @@ static void ad_agg_selection_logic(struct aggregator *agg,
 		if (active) {
 			for (port = active->lag_ports; port;
 			     port = port->next_port_in_aggregator) {
-				if (!port->slave->individual) {
+				if (!ad_slave_in_bypass(port->slave)) {
 					__disable_port(port);
 					port->sm_vars &= ~AD_PORT_BYPASS;
-					port->slave->individual = 0;
 				}
 			}
 		}
@@ -1763,7 +1763,7 @@ static void ad_agg_selection_logic(struct aggregator *agg,
 	if (active) {
 		for (port = active->lag_ports; port;
 		     port = port->next_port_in_aggregator) {
-			if (is_slave_in_bypass(port->slave)) {
+			if (ad_slave_in_bypass(port->slave)) {
 				pr_debug("(%s) agg active and no "
 					 "partner\n",
 					 port->slave->dev->name);
@@ -2547,7 +2547,7 @@ int bond_3ad_set_carrier(struct bonding *bond)
 		goto out;
 	}
 	active = __get_active_agg(&(SLAVE_AD_INFO(first_slave)->aggregator));
-	bypass = is_agg_in_bypass(active);
+	bypass = bond_3ad_in_bypass(bond);
 	pr_debug("%s %s active id: %d bypass: %d\n",
 		 __FUNCTION__,
 		 bond->dev->name, active ? active->aggregator_identifier : 0,
@@ -2678,4 +2678,44 @@ void bond_3ad_update_lacp_rate(struct bonding *bond)
 			port->actor_oper_port_state &= ~AD_STATE_LACP_TIMEOUT;
 	}
 	spin_unlock_bh(&bond->mode_lock);
+}
+
+/**
+ * bond_3ad_is_bypass_enabled - is bond eligible to go into lacp bypass mode
+ * @bond: the bond we're looking at
+ *
+ * Return true if enabled, false otherwise
+ */
+bool bond_3ad_is_bypass_enabled(struct bonding *bond)
+{
+	return !!(bond->params.lacp_bypass);
+}
+
+/**
+ * bond_3ad_in_bypass - not only check that bypass is enabled but check that
+ *                      we are in bypass.
+ * @bond: the bond we are looking at
+ *
+ * If any one slave in the bond has its state machine vars is in bypass, then
+ * the bond is considered in bypass.
+ *
+ * Note: RCU read lock must be held
+ *
+ * Return true if enabled, false otherwise
+ */
+bool bond_3ad_in_bypass(struct bonding *bond)
+{
+	struct slave *slave;
+	struct list_head *iter;
+
+	if (!bond)
+		return false;
+
+	if (!bond_3ad_is_bypass_enabled(bond))
+		return false;
+
+	bond_for_each_slave_rcu(bond, slave, iter)
+		if (SLAVE_AD_INFO(slave)->port.sm_vars & AD_PORT_BYPASS)
+			return true;
+	return false;
 }
