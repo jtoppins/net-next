@@ -95,6 +95,19 @@ static ssize_t ad_actor_oper_port_state_show(struct slave *slave, char *buf)
 }
 static SLAVE_ATTR_RO(ad_actor_oper_port_state);
 
+static ssize_t ad_rx_state_show(struct slave *slave, char *buf)
+{
+	const struct port *ad_port;
+	ssize_t count = 0;
+
+	if (BOND_MODE(slave->bond) == BOND_MODE_8023AD) {
+		ad_port = &SLAVE_AD_INFO(slave)->port;
+		count = sprintf(buf, "%u\n", ad_port->sm_rx_state);
+	}
+	return count;
+}
+static SLAVE_ATTR_RO(ad_rx_state);
+
 static ssize_t ad_partner_oper_port_state_show(struct slave *slave, char *buf)
 {
 	const struct port *ad_port;
@@ -119,6 +132,7 @@ static const struct slave_attribute *slave_attrs[] = {
 	&slave_attr_ad_aggregator_id,
 	&slave_attr_ad_actor_oper_port_state,
 	&slave_attr_ad_partner_oper_port_state,
+	&slave_attr_ad_rx_state,
 	NULL
 };
 

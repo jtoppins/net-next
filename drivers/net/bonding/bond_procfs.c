@@ -130,6 +130,11 @@ static void bond_info_show_master(struct seq_file *seq)
 		seq_puts(seq, "\n802.3ad info\n");
 		seq_printf(seq, "LACP rate: %s\n",
 			   (bond->params.lacp_fast) ? "fast" : "slow");
+		optval = bond_opt_get_val(BOND_OPT_LACP_BYPASS,
+					      bond->params.lacp_bypass);
+		seq_printf(seq, "LACP bypass: %s\n", optval->string);
+		seq_printf(seq, "LACP bypass active: %s\n",
+			   bond_3ad_in_bypass(bond) ? "Yes" : "No");
 		seq_printf(seq, "Min links: %d\n", bond->params.min_links);
 		optval = bond_opt_get_val(BOND_OPT_AD_SELECT,
 					  bond->params.ad_select);
@@ -189,6 +194,9 @@ static void bond_info_show_slave(struct seq_file *seq,
 	if (BOND_MODE(bond) == BOND_MODE_8023AD) {
 		const struct port *port = &SLAVE_AD_INFO(slave)->port;
 		const struct aggregator *agg = port->aggregator;
+
+		seq_printf(seq, "RX State Machine: %d\n",
+			   SLAVE_AD_INFO(slave)->port.sm_rx_state);
 
 		if (agg) {
 			seq_printf(seq, "Aggregator ID: %d\n",

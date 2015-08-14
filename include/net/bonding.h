@@ -139,6 +139,7 @@ struct bond_params {
 	u16 ad_actor_sys_prio;
 	u16 ad_user_port_key;
 	u8 ad_actor_system[ETH_ALEN];
+	bool lacp_bypass;
 };
 
 struct bond_parm_tbl {
